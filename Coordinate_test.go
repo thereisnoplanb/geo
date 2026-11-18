@@ -20,7 +20,7 @@ func TestCoordinate_MarshalJSON(t *testing.T) {
 			name:      "valid coordinate",
 			latitude:  37.7749,
 			longitude: -122.4194,
-			want:      []byte(`{"latitude":37.7749,"longitude":-122.4194}`),
+			want:      []byte(`"(37.7749,-122.4194)"`),
 			wantErr:   false,
 		},
 	}
@@ -53,26 +53,31 @@ func TestCoordinate_UnmarshalJSON(t *testing.T) {
 		// Named input parameters for target function.
 		data    []byte
 		wantErr bool
+		want    geo.Coordinate
 	}{
 		{
 			name:    "valid coordinate",
-			data:    []byte(`{"latitude":37.7749,"longitude":-122.4194}`),
+			data:    []byte(`"(37.7749,-122.4194)"`),
 			wantErr: false,
+			want:    geo.MustCoordinate(37.7749, -122.4194),
 		},
 		{
 			name:    "invalid coordinate",
-			data:    []byte(`{"latitude":100.0,"longitude":200.0}`),
+			data:    []byte(`"(200,100)"`),
 			wantErr: true,
+			want:    geo.Coordinate{},
 		},
 		{
-			name:    "missing latitude",
-			data:    []byte(`{"longitude":-122.4194}`),
+			name:    "invalid coordinate format",
+			data:    []byte(`"(37.7749)"`),
 			wantErr: true,
+			want:    geo.Coordinate{},
 		},
 		{
-			name:    "missing longitude",
-			data:    []byte(`{"latitude":37.7749}`),
+			name:    "object format is unsupported",
+			data:    []byte(`"(37.7749,-122.4194,0)"`),
 			wantErr: true,
+			want:    geo.Coordinate{},
 		},
 	}
 	for _, tt := range tests {
@@ -87,6 +92,9 @@ func TestCoordinate_UnmarshalJSON(t *testing.T) {
 			}
 			if tt.wantErr {
 				t.Fatal("UnmarshalJSON() succeeded unexpectedly")
+			}
+			if !this.Equals(tt.want) {
+				t.Errorf("UnmarshalJSON() = (%v,%v), want (%v,%v)", this.Latitude(), this.Longitude(), tt.want.Latitude(), tt.want.Longitude())
 			}
 		})
 	}

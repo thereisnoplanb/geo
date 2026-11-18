@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 )
 
 type Coordinate struct {
@@ -178,42 +179,41 @@ func (this Coordinate) String() string {
 	return fmt.Sprintf("%s,%s", strconv.FormatFloat(this.latitude, 'f', -1, 64), strconv.FormatFloat(this.longitude, 'f', -1, 64))
 }
 
-type coordinateJSON struct {
-	Latitude  *float64 `json:"latitude"`
-	Longitude *float64 `json:"longitude"`
-}
-
-func (this coordinateJSON) Validate() error {
-	if this.Latitude == nil {
-		return fmt.Errorf("latitude is required")
-	}
-	if this.Longitude == nil {
-		return fmt.Errorf("longitude is required")
-	}
-	return validateCoordinate(*this.Latitude, *this.Longitude)
-}
-
 // MarshalJSON implements the json.Marshaler interface for the Coordinate type.
-// It converts the Coordinate into a JSON representation.
+// It converts the Coordinate into a JSON string in the format "(latitude,longitude)".
 func (this Coordinate) MarshalJSON() ([]byte, error) {
-	return json.Marshal(coordinateJSON{
-		Latitude:  &this.latitude,
-		Longitude: &this.longitude,
-	})
+	latitude := strconv.FormatFloat(this.latitude, 'f', -1, 64)
+	longitude := strconv.FormatFloat(this.longitude, 'f', -1, 64)
+	return json.Marshal(fmt.Sprintf("(%s,%s)", latitude, longitude))
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface for the Coordinate type.
-// It parses the JSON representation and populates the Coordinate fields.
+// It parses a JSON string in the format "(latitude,longitude)" and populates the Coordinate fields.
 func (this *Coordinate) UnmarshalJSON(data []byte) error {
-	var coordinate coordinateJSON
-	if err := json.Unmarshal(data, &coordinate); err != nil {
+	var value string
+	if err := json.Unmarshal(data, &value); err != nil {
 		return err
 	}
-	if err := coordinate.Validate(); err != nil {
+	if len(value) < 5 || value[0] != '(' || value[len(value)-1] != ')' {
+		return fmt.Errorf("invalid coordinate format: expected (latitude,longitude)")
+	}
+	latitudeText, longitudeText, found := strings.Cut(value[1:len(value)-1], ",")
+	if !found {
+		return fmt.Errorf("invalid coordinate format: expected (latitude,longitude)")
+	}
+	latitude, err := strconv.ParseFloat(latitudeText, 64)
+	if err != nil {
+		return fmt.Errorf("invalid latitude: %w", err)
+	}
+	longitude, err := strconv.ParseFloat(longitudeText, 64)
+	if err != nil {
+		return fmt.Errorf("invalid longitude: %w", err)
+	}
+	if err := validateCoordinate(latitude, longitude); err != nil {
 		return err
 	}
-	this.latitude = *coordinate.Latitude
-	this.longitude = *coordinate.Longitude
+	this.latitude = latitude
+	this.longitude = longitude
 	return nil
 }
 
